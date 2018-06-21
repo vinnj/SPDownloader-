@@ -5,6 +5,9 @@ using System.IO;
 using System.Net;
 using System.Security;
 using System.Configuration;
+using Microsoft.SharePoint.Client.Search.Query;
+using Microsoft.SharePoint.Client.Utilities;
+using System.Collections.Generic;
 
 namespace SPOnlineListDownloader
 {
@@ -14,29 +17,29 @@ namespace SPOnlineListDownloader
         //http://www.nuget.org/packages/nlog
         private static Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
-        string listName = "Custom List";
         string LocalRootFolder = @"C:\Users\vinn\Documents\sharepointdocs";
+        string folderName = "Applications";
 
         public void DownloadAttachments()
         {
             try
             {
-                int startListID;
-                Console.WriteLine("Enter Starting List ID");
-                if (!Int32.TryParse(Console.ReadLine(), out startListID))
-                {
-                    Console.WriteLine("Invalid ID");
-                    Console.WriteLine("Press any key to exit...");
-                    Console.ReadKey();
-                    return;
-                }
+                //int startListID;
+                //Console.WriteLine("Enter Starting List ID");
+                //if (!Int32.TryParse(Console.ReadLine(), out startListID))
+                //{
+                //    Console.WriteLine("Invalid ID");
+                //    Console.WriteLine("Press any key to exit...");
+                //    Console.ReadKey();
+                //    return;
+                //}
 
                 string pass = ConfigurationManager.AppSettings["Password"];
                 
-                String siteUrl = "https://tridentcrm1.sharepoint.com";
-                String listName = "Custom List";
+                String siteUrl = "https://tridentcrm1.sharepoint.com/sites/crm_001";
+                String listName = "CRMDoc Attachment";
                 SecureString Password = new SecureString();
-               
+                
 
                 foreach (char c in pass.ToCharArray()) Password.AppendChar(c);
                 Password.MakeReadOnly();
@@ -53,9 +56,19 @@ namespace SPOnlineListDownloader
                     clientContext.Load(oSite);
                     clientContext.ExecuteQuery();
 
-                    // Get the Web
+                    // Get the Web		CustomizedPageStatus	None	Microsoft.SharePoint.Client.CustomizedPageStatus
+
                     Web oWeb = clientContext.Web;
                     clientContext.Load(oWeb);
+                    clientContext.ExecuteQuery();
+
+                    Microsoft.SharePoint.Client.File fl = clientContext.Web.GetFileByServerRelativeUrl("/sites/crm_001/CRMDoc%20Attachment/scansample.pdf");
+                    clientContext.Load(fl);
+                    clientContext.ExecuteQuery();
+
+                    ClientResult<String> result = fl.ListItemAllFields.GetWOPIFrameUrl(SPWOPIFrameAction.View);
+                    string url = fl.ListItemAllFields.ContentType.ToString();
+                    clientContext.Load(fl.ListItemAllFields);
                     clientContext.ExecuteQuery();
 
                     CamlQuery query = new CamlQuery();
@@ -69,21 +82,98 @@ namespace SPOnlineListDownloader
                     clientContext.Load(items);
                     clientContext.ExecuteQuery();
 
+
+                    //Get WOPI URL
+                    var query2 = new CamlQuery();
+                    query.ViewXml = "...";
+
+                    var listItems = oList.GetItems(query2);
+                    clientContext.Load(listItems);
+                    clientContext.ExecuteQuery();
+
+                    var wopiUrls = new Dictionary<ListItem, ClientResult<string>>();
+
+                    // The useWopi flag is set when WOPI URLs are desired
+                  
+                        foreach (var listItem in listItems)
+                        {
+                            wopiUrls[listItem] = listItem.GetWOPIFrameUrl(SPWOPIFrameAction.Edit);
+                            clientContext.Load(listItem, item => item.Id);
+                        }
+                        // This query includes Id, FileSystemObjectType, DisplayName, and Modified
+                        //clientContext.ExecuteQuery();
+                    
+
+                    //string relativeUrl = oWeb.ServerRelativeUrl;
+                    //Folder retrievedFolder = oWeb.GetFolderByServerRelativeUrl(relativeUrl);
+                    //clientContext.Load(retrievedFolder);
+                    //clientContext.ExecuteQuery();
+
+                    //CamlQuery camlQuery = new CamlQuery();
+                    //camlQuery.ViewXml = @"";
+
+                    //Use this statement if List is completely fresh and has no list items i.e no folders are present
+                    //under the given list
+                    if (oList.ItemCount == 0)
+                    {
+                        DateTime dt = DateTime.Now;
+                        string date = dt.ToShortDateString().ToString();
+                        string modifiedDate = date.Replace("/", "-");
+                        string newFolderName = "HBApplication " + modifiedDate;
+
+                        Folder newFolder = oList.RootFolder.Folders.Add(newFolderName);
+                        clientContext.Load(newFolder);
+                        clientContext.ExecuteQuery();
+                    }
+
+                    //Use this statement if the given list will always have some items i.e folder present in the list
                     foreach (ListItem listItem in items)
                     {
-                        if (Int32.Parse(listItem["ID"].ToString()) >= startListID)
-                        {
+
+                        //if (Int32.Parse(listItem["ID"].ToString()) >= startListID)
+                        //{
+
+                            DateTime dt = DateTime.Now;
+                            string date = dt.ToShortDateString().ToString();
+                            string existingFolder = listItem["FileLeafRef"].ToString();
+                            string modifiedDate = date.Replace("/", "-");
+                            string folderToCheck = "HBApplication " + modifiedDate;
+
+                            if (!existingFolder.Contains(modifiedDate))
+                            {
+
+                                string newFolderName = folderToCheck;
+
+                                List docs = clientContext.Web.Lists.GetByTitle(listName);
+                                clientContext.Load(docs, l => l.RootFolder);
+                                clientContext.Load(docs.RootFolder, l => l.Folders);
+
+                                docs.EnableFolderCreation = true;
+                                docs.Update();
+                                clientContext.ExecuteQuery();
+
+
+                                Folder newFolder = docs.RootFolder.Folders.Add(newFolderName);
+                                clientContext.Load(newFolder);
+                                clientContext.ExecuteQuery();
+
+
+                            }
+
+                            else
+                            {
+                                Console.WriteLine("Folder already there !");
+                            }
+
+
+
+                            //string name = listItem["title"].ToString();
 
                             Console.WriteLine("Process Attachments for ID " +
                                   listItem["ID"].ToString());
 
                             Folder folder =
-                                  oWeb.GetFolderByServerRelativeUrl(oSite.Url +
-                                  "/Lists/" + listName + "/Attachments/" +
-
-                                  listItem["ID"]);
-
-                            clientContext.Load(folder);
+                                  oWeb.GetFolderByServerRelativeUrl("/CRM Documents/");
 
                             try
                             {
@@ -137,7 +227,7 @@ namespace SPOnlineListDownloader
                                     Console.WriteLine(" already existed!");
                                 }
                             }
-                        }
+                        //}
                     }
                 }
             }
