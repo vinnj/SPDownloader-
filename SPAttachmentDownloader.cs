@@ -17,7 +17,7 @@ namespace SPOnlineListDownloader
         //http://www.nuget.org/packages/nlog
         private static Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
-        string LocalRootFolder = @"C:\Users\vinn\Documents\sharepointdocs";
+        string LocalRootFolder = @"Path to your file";
         string folderName = "Applications";
 
         public void DownloadAttachments()
@@ -36,8 +36,8 @@ namespace SPOnlineListDownloader
 
                 string pass = ConfigurationManager.AppSettings["Password"];
                 
-                String siteUrl = "https://tridentcrm1.sharepoint.com/sites/crm_001";
-                String listName = "CRMDoc Attachment";
+                String siteUrl = "";
+                String listName = "";
                 SecureString Password = new SecureString();
                 
 
@@ -46,7 +46,7 @@ namespace SPOnlineListDownloader
 
                 using (ClientContext clientContext = new ClientContext(siteUrl))
                 {
-                    clientContext.Credentials = new SharePointOnlineCredentials("vj@tridentcrm1.onmicrosoft.com", Password);
+                    clientContext.Credentials = new SharePointOnlineCredentials("firstname.lastname@email.com", Password);
                     Console.WriteLine("Started Attachment Download " + siteUrl);
                     logger.Info("Started Attachment Download" + siteUrl);
                     //clientContext.Credentials = credentials;
@@ -62,7 +62,7 @@ namespace SPOnlineListDownloader
                     clientContext.Load(oWeb);
                     clientContext.ExecuteQuery();
 
-                    Microsoft.SharePoint.Client.File fl = clientContext.Web.GetFileByServerRelativeUrl("/sites/crm_001/CRMDoc%20Attachment/scansample.pdf");
+                    Microsoft.SharePoint.Client.File fl = clientContext.Web.GetFileByServerRelativeUrl("");
                     clientContext.Load(fl);
                     clientContext.ExecuteQuery();
 
@@ -210,7 +210,7 @@ namespace SPOnlineListDownloader
                                       oFile.ServerRelativeUrl);
 
                                 string localFilePath = LocalFileLocation(oFile.ServerRelativeUrl, true);
-                                //string localFilePath = @"C:\Users\vinn\Documents\sharepointdocs";
+                                
 
                                 if (!System.IO.File.Exists(localFilePath))
                                 {
